@@ -1,0 +1,10 @@
+pluginManagement {
+    repositories {
+        mavenCentral() // Maven Central 仓库
+        gradlePluginPortal() // Gradle 插件仓库
+        // 移除 google()，因为它在 settings.gradle 中无效
+    }
+}
+
+rootProject.name = "DataForestShield"
+include ':dfshield'

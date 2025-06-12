@@ -1,0 +1,98 @@
+plugins {
+    id 'com.android.library'     // 用于构建 Android AAR
+    id 'maven-publish'           // 用于发布 Maven 产物（生成 POM、上传本地等）
+    id 'signing'                 // 用于生成 GPG 签名（可选，上传中央仓库推荐）
+    id 'base'                    // 添加 `clean` 和 `distZip` 等通用打包任务支持
+}
+
+android {
+    namespace 'com.xksztech.shieldsdk'
+    compileSdk 33
+
+    defaultConfig {
+        minSdk 21
+        targetSdk 33
+        versionCode 1
+        versionName "1.0.0"
+    }
+
+    publishing {
+        singleVariant("release") {
+            withSourcesJar()  // 自动生成 -sources.jar
+        }
+    }
+}
+// 1 可选：sourcesJar（如果已用 withSourcesJar 可省略）
+task sourcesJar(type: Jar) {
+    archiveClassifier.set('sources')
+    from android.sourceSets.main.java.srcDirs
+}
+
+// 2 Maven 发布配置：包括 groupId、artifactId、version、POM 信息
+afterEvaluate {
+    publishing {
+        publications {
+            mavenAar(MavenPublication) {
+                groupId = 'com.xksztech'
+                artifactId = 'shieldsdk'
+                version = '1.0.0'
+
+                from components.release  // AAR 文件
+                artifact sourcesJar      // 加入 sources.jar（虽然 withSourcesJar 也会自动加）
+
+                // POM 元信息
+                pom {
+                    name.set('Shield SDK')
+                    description.set('Android Shield SDK')
+                    url.set('https://github.com/xksztech/shield_sdk')
+                    licenses {
+                        license {
+                            name.set('Apache-2.0')
+                            url.set('https://www.apache.org/licenses/LICENSE-2.0.txt')
+                        }
+                    }
+                    developers {
+                        developer {
+                            id.set('xksztech')
+                            name.set('xksz tech')
+                            email.set('xksztech@gmail.com')
+                        }
+                    }
+                    scm {
+                        connection.set('scm:git:git://github.com/xksztech/shield_sdk.git')
+                        developerConnection.set('scm:git:ssh://github.com/xksztech/shield_sdk.git')
+                        url.set('https://github.com/xksztech/shield_sdk')
+                    }
+                }
+            }
+        }
+
+        // 3 发布到本地 staging 仓库（非 OSSRH，方便打 zip）
+        repositories {
+            maven {
+                name = "local"
+                url = uri("$buildDir/tmp/repo")
+            }
+        }
+    }
+}
+
+// 4 GPG 签名（可选，建议开启）
+signing {
+    sign publishing.publications.mavenAar
+}
+
+// 54⃣ 打 zip 包任务（包含所有上传所需文件）
+tasks.register('distZip', Zip) {
+    group = 'distribution'
+    description = 'Bundle AAR + POM + sources into a zip for manual upload'
+    dependsOn 'publishMavenAarPublicationToLocalRepository'
+
+    // 指定发布路径内的 artifacts
+    from("$buildDir/tmp/repo/com/xksztech/shieldsdk/1.0.0") {
+        include '**/*.aar', '**/*.jar', '**/*.pom', '**/*.asc'
+    }
+
+    archiveFileName.set("shieldsdk-1.0.0-bundle.zip")
+    destinationDirectory.set(file("$buildDir/distributions"))
+}
